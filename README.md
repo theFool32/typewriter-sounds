@@ -28,7 +28,7 @@ Usage
 
 cd into the project's directory and type:
 
-    $ python typewriter~sounds~.py
+    $ python typewriter_sounds.py
 
 to stop the program, just type CTRL-C.
 
