@@ -1,82 +1,71 @@
+#!/usr/bin/env python
 from __future__ import print_function
 import sys
 import os
+import random
 from Xlib import X, XK, display
 from Xlib.ext import record
 from Xlib.protocol import rq
-import pygame
+import sdl2
+import sdl2.sdlmixer
+
+class AudioPlayback (object):
+
+    def __init__ (self):
+        if sdl2.SDL_Init(sdl2.SDL_INIT_AUDIO) != 0:
+            raise RuntimeError("Cannot initialize audio system: {}".format(sdl2.SDL_GetError()))
+        fmt = sdl2.sdlmixer.MIX_DEFAULT_FORMAT
+        if sdl2.sdlmixer.Mix_OpenAudio(44100, fmt, 2, 1024) != 0:
+            raise RuntimeError("Cannot open mixed audio: {}".format(sdl2.sdlmixer.Mix_GetError()))
+        sdl2.sdlmixer.Mix_AllocateChannels(64)
+        self._bank = {}
+
+    def load (self, filename):
+        filename = os.path.abspath(filename)
+        uuid = os.path.normcase(filename)
+        if uuid not in self._bank:
+            if not isinstance(filename, bytes):
+                filename = filename.encode('utf-8')
+            sample = sdl2.sdlmixer.Mix_LoadWAV(filename)
+            if sample is None:
+                return None
+            self._bank[uuid] = sample
+        return self._bank[uuid]
+
+    def play (self, sample, channel=-1):
+        channel = sdl2.sdlmixer.Mix_PlayChannel(channel, sample, 0)
+        if channel < 0:
+            return -1
+        return channel
+
+    def is_playing (self, channel):
+        return sdl2.sdlmixer.Mix_Playing(channel)
+
+    def set_volume (self, channel, volume = 1.0):
+        if channel < 0:
+            return False
+        volint = int(volume * sdl2.sdlmixer.MIX_MAX_VOLUME)
+        sdl2.sdlmixer.Mix_Volume(channel, volint)
+        return True
 
 class TypeWriterSounds:
-
-    """
-    Typewriter sounds emulator for Python
-    =====================================
-
-    This program plays typewriter sounds each time a key is pressed, giving
-    the user the vintage experience of and old typewriter machine.
-
-    The code is inspired on the keylogger demo that comes in the The Python
-    X Library ( http://python-xlib.sourceforge.net/ ). The logic is simple:
-    grab the keycode of a pressed key, and instead to record it (as any
-    keylogger does), just play a sound.
-
-    As the key detection is made using Xlib, this program should work on
-    those platforms that support X11. It was developed and tested under
-    Linux.
-
-    Sound samples come from https://www.freesound.org/, some were modified
-    for this project.
-
-    Requeriments
-    ------------
-
-    -  Python 2.7 (but should work with 3.5)
-    -  `X11 and Xlib bindings for
-       Python <http://python-xlib.sourceforge.net/>`__
-    -  `PyGame <http://pygame.org>`__ (for sound)
-
-    Usage
-    -----
-
-    cd into the project's directory and type:
-
-    ::
-
-        $ python typewriter~sounds~.py
-
-    to stop the program, just type CTRL-C.
-
-    TODO
-    ----
-
-    -  Test it in different platforms. In Windows it should work using
-       Cygwin
-    -  Add an installer
-    -  Eventually: add a tray icon GUI.
-
-    Author
-    ------
-
-    Manuel Arturo Izquierdo aizquier@gmail.com
-
-    """
 
     def __init__(self):
         # * Initialises pygame mixer. A buffer of 512 bytes is required for
         # * better performance
-        pygame.mixer.init(buffer=512)
 
+        self.ap = AudioPlayback()
         self.bellcount = 0
 
         # * Preloads sound samples
         self.keysounds = {
-            'load' : pygame.mixer.Sound('samples/manual_load_long.wav'),
-            'shift' : pygame.mixer.Sound('samples/manual_shift.wav'),
-            'delete': pygame.mixer.Sound('samples/manual_backspace.wav'),
-            'space': pygame.mixer.Sound('samples/manual_space.wav'),
-            'key': pygame.mixer.Sound('samples/manual_key.wav'),
-            'enter': pygame.mixer.Sound('samples/manual_return.wav'),
-            'bell': pygame.mixer.Sound('samples/manual_bell.wav')
+            'load' : self.ap.load('samples/manual_load_long.wav'),
+            'shift' : self.ap.load('samples/manual_shift.wav'),
+            'delete': self.ap.load('samples/manual_shift.wav'),
+            'space': self.ap.load('samples/manual_space.wav'),
+            'key': self.ap.load('samples/manual_key.wav'),
+            'enter': self.ap.load('samples/manual_key.wav'),
+            'bell': self.ap.load('samples/manual_bell.wav')
         }
 
         # * Get keynames from X11
@@ -84,12 +73,12 @@ class TypeWriterSounds:
         for name in dir(XK):
             if name[:3] == "XK_" :
                 self.keys[name] = getattr(XK, name) 
-                
+
 
         print("TypeWriter Sounds Emulator. v1.0")
         print("type now and enjoy the vintage experience!...")
-        self.keysounds['bell'].play()
-        self.keysounds['enter'].play()
+        self.ap.play(self.keysounds['bell'])
+        self.ap.play(self.keysounds['enter'])
 
 
         # * Activates key grabber
@@ -101,24 +90,24 @@ class TypeWriterSounds:
         if not self.record_dpy.has_extension("RECORD"):
             print ("RECORD extension not found")
             sys.exit(1)
-            
-            
+
+
 
         # Create a recording context; we only want key events
         self.ctx = self.record_dpy.record_create_context(
-                0,
-                [record.AllClients],
-                [{
-                        'core_requests': (0, 0),
-                        'core_replies': (0, 0),
-                        'ext_requests': (0, 0, 0, 0),
-                        'ext_replies': (0, 0, 0, 0),
-                        'delivered_events': (0, 0),
-                        'device_events': (X.KeyPress, X.KeyPress),
-                        'errors': (0, 0),
-                        'client_started': False,
-                        'client_died': False,
-                }])
+            0,
+            [record.AllClients],
+            [{
+                'core_requests': (0, 0),
+                'core_replies': (0, 0),
+                'ext_requests': (0, 0, 0, 0),
+                'ext_replies': (0, 0, 0, 0),
+                'delivered_events': (0, 0),
+                'device_events': (X.KeyPress, X.KeyPress),
+                'errors': (0, 0),
+                'client_started': False,
+                'client_died': False,
+            }])
 
 
         try:
@@ -126,7 +115,7 @@ class TypeWriterSounds:
             # record_disable_context,
             # while calling the callback function in the meantime
             self.record_dpy.record_enable_context(  self.ctx, \
-                                                    self.record_callback)
+                                                  self.record_callback)
         except KeyboardInterrupt:
             # Exits if CTRL-c is typed
             self.record_dpy.record_free_context(self.ctx)
@@ -146,9 +135,9 @@ class TypeWriterSounds:
         data = reply.data
         while len(data):
             event, data = rq.EventField(None).\
-                            parse_binary_value( data, 
-                                                self.record_dpy.display, 
-                                                None, None)
+                parse_binary_value( data, 
+                                   self.record_dpy.display, 
+                                   None, None)
 
             if event.type == X.KeyPress:
                 # * If a key is pressed, gets its keycode 
@@ -160,18 +149,18 @@ class TypeWriterSounds:
 
                 # * - Enter      
                 if keysym == self.keys['XK_Return']:
-                    self.keysounds['enter'].play()
+                    sound = self.keysounds['enter']
                     self.bellcount = 0
                 
                 # * - Spacebar
                 elif keysym == self.keys['XK_space']:
-                    self.keysounds['space'].play()
+                    sound = self.keysounds['space']
                     self.bellcount += 1
                 
                 # * - Delete and backspace   
                 elif (keysym == self.keys['XK_Delete']) or \
                      (keysym == self.keys['XK_BackSpace']):
-                    self.keysounds['delete'].play()
+                    sound = self.keysounds['delete']
                     self.bellcount -= 1
                     if self.bellcount <= 0:
                         self.bellcount = 0
@@ -206,24 +195,29 @@ class TypeWriterSounds:
                         keysym == self.keys['XK_Escape'] or\
                         keysym > 65535:
                             
-                    self.keysounds['shift'].play()
+                    sound = self.keysounds['shift']
                 
                 # * - Page Up/Down, Home/End: play page load
                 elif    keysym == self.keys['XK_Page_Up'] or \
                         keysym == self.keys['XK_Next'] or\
                         keysym == self.keys['XK_Home'] or \
                         keysym == self.keys['XK_End']:
-                    self.keysounds['load'].play()
+                    sound = self.keysounds['load']
                 
                 # * - A simple key         
                 else:
-                    self.keysounds['key'].play()
+                    sound = self.keysounds['key']
                     self.bellcount += 1
                 
                 # * - After 70 consecutive keypresses, play the bell sound    
                 if self.bellcount == 70:
-                    self.keysounds['bell'].play()
+                    sound = self.keysounds['bell']
                     self.bellcount = 0
+
+                # volume = random.random() * 0.2 + 0.8
+                # sound.set_volume(volume)
+                # sound.play()
+                self.ap.play(sound)
 
 if __name__ == '__main__':
     TypeWriterSounds()

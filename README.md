@@ -1,6 +1,9 @@
 Typewriter sounds emulator for Python
 =====================================
 
+Forked from [aizquier/typewriter-sounds](https://github.com/aizquier/typewriter-sounds).
+Using SDL2 instead of pygame since pygame causes high CPU usage.
+
 This program plays typewriter sounds each time a key is pressed, giving
 the user the vintage experience of and old typewriter machine.
 
@@ -19,9 +22,9 @@ for this project.
 Requeriments
 ------------
 
--   Python 2.7 (but should work with 3.5)
+-   Python 2.7
 -   [X11 and Xlib bindings for Python](http://python-xlib.sourceforge.net/)
--   [PyGame](http://pygame.org) (for sound)
+-   [PySDL2](http://pygame.org) (for sound)
 
 Usage
 -----
@@ -32,16 +35,10 @@ cd into the project's directory and type:
 
 to stop the program, just type CTRL-C.
 
-TODO
+Reference
 ----
 
--   Test it in different platforms. In Windows it should work using
-    Cygwin
--   Add an installer
--   Eventually: add a tray icon GUI.
-
-Author
-------
-
-Manuel Arturo Izquierdo <aizquier@gmail.com>
+Code and sounds samples come from:
+- [aizquier/typewriter-sounds](https://github.com/aizquier/typewriter-sounds).
+- [skywind3000/vim-keysound](https://github.com/skywind3000/vim-keysound).
 
