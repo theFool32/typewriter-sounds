@@ -2,25 +2,27 @@
 from __future__ import print_function
 import sys
 import os
-import random
 from Xlib import X, XK, display
 from Xlib.ext import record
 from Xlib.protocol import rq
 import sdl2
 import sdl2.sdlmixer
 
+
 class AudioPlayback (object):
 
-    def __init__ (self):
+    def __init__(self):
         if sdl2.SDL_Init(sdl2.SDL_INIT_AUDIO) != 0:
-            raise RuntimeError("Cannot initialize audio system: {}".format(sdl2.SDL_GetError()))
+            raise RuntimeError("Cannot initialize audio system: {}"
+                               .format(sdl2.SDL_GetError()))
         fmt = sdl2.sdlmixer.MIX_DEFAULT_FORMAT
         if sdl2.sdlmixer.Mix_OpenAudio(44100, fmt, 2, 1024) != 0:
-            raise RuntimeError("Cannot open mixed audio: {}".format(sdl2.sdlmixer.Mix_GetError()))
+            raise RuntimeError("Cannot open mixed audio: {}"
+                               .format(sdl2.sdlmixer.Mix_GetError()))
         sdl2.sdlmixer.Mix_AllocateChannels(64)
         self._bank = {}
 
-    def load (self, filename):
+    def load(self, filename):
         filename = os.path.abspath(filename)
         uuid = os.path.normcase(filename)
         if uuid not in self._bank:
@@ -32,21 +34,22 @@ class AudioPlayback (object):
             self._bank[uuid] = sample
         return self._bank[uuid]
 
-    def play (self, sample, channel=-1):
+    def play(self, sample, channel=-1):
         channel = sdl2.sdlmixer.Mix_PlayChannel(channel, sample, 0)
         if channel < 0:
             return -1
         return channel
 
-    def is_playing (self, channel):
+    def is_playing(self, channel):
         return sdl2.sdlmixer.Mix_Playing(channel)
 
-    def set_volume (self, channel, volume = 1.0):
+    def set_volume(self, channel, volume=1.0):
         if channel < 0:
             return False
         volint = int(volume * sdl2.sdlmixer.MIX_MAX_VOLUME)
         sdl2.sdlmixer.Mix_Volume(channel, volint)
         return True
+
 
 class TypeWriterSounds:
 
@@ -59,8 +62,8 @@ class TypeWriterSounds:
 
         # * Preloads sound samples
         self.keysounds = {
-            'load' : self.ap.load('samples/manual_load_long.wav'),
-            'shift' : self.ap.load('samples/manual_shift.wav'),
+            'load': self.ap.load('samples/manual_load_long.wav'),
+            'shift': self.ap.load('samples/manual_shift.wav'),
             'delete': self.ap.load('samples/manual_shift.wav'),
             'space': self.ap.load('samples/manual_space.wav'),
             'key': self.ap.load('samples/manual_key.wav'),
@@ -71,15 +74,13 @@ class TypeWriterSounds:
         # * Get keynames from X11
         self.keys = {}
         for name in dir(XK):
-            if name[:3] == "XK_" :
-                self.keys[name] = getattr(XK, name) 
-
+            if name[:3] == "XK_":
+                self.keys[name] = getattr(XK, name)
 
         print("TypeWriter Sounds Emulator. v1.0")
         print("type now and enjoy the vintage experience!...")
         self.ap.play(self.keysounds['bell'])
         self.ap.play(self.keysounds['enter'])
-
 
         # * Activates key grabber
 
@@ -88,10 +89,8 @@ class TypeWriterSounds:
 
         # Check if the extension is present
         if not self.record_dpy.has_extension("RECORD"):
-            print ("RECORD extension not found")
+            print("RECORD extension not found")
             sys.exit(1)
-
-
 
         # Create a recording context; we only want key events
         self.ctx = self.record_dpy.record_create_context(
@@ -109,12 +108,11 @@ class TypeWriterSounds:
                 'client_died': False,
             }])
 
-
         try:
-            # Enable the context; this only returns after a call to 
+            # Enable the context; this only returns after a call to
             # record_disable_context,
             # while calling the callback function in the meantime
-            self.record_dpy.record_enable_context(  self.ctx, \
+            self.record_dpy.record_enable_context(self.ctx,
                                                   self.record_callback)
         except KeyboardInterrupt:
             # Exits if CTRL-c is typed
@@ -135,38 +133,37 @@ class TypeWriterSounds:
         data = reply.data
         while len(data):
             event, data = rq.EventField(None).\
-                parse_binary_value( data, 
-                                   self.record_dpy.display, 
+                parse_binary_value(data,
+                                   self.record_dpy.display,
                                    None, None)
 
             if event.type == X.KeyPress:
-                # * If a key is pressed, gets its keycode 
-                pr = event.type == X.KeyPress and "Press" or "Release"
+                # * If a key is pressed, gets its keycode
+                # pr = event.type == X.KeyPress and "Press" or "Release"
                 keysym = self.local_dpy.keycode_to_keysym(event.detail, 0)
-                
 
-                # * Plays an audio sample according the keycode   
+                # * Plays an audio sample according the keycode
 
-                # * - Enter      
+                # * - Enter
                 if keysym == self.keys['XK_Return']:
                     sound = self.keysounds['enter']
                     self.bellcount = 0
-                
+
                 # * - Spacebar
                 elif keysym == self.keys['XK_space']:
                     sound = self.keysounds['space']
                     self.bellcount += 1
-                
-                # * - Delete and backspace   
+
+                # * - Delete and backspace
                 elif (keysym == self.keys['XK_Delete']) or \
                      (keysym == self.keys['XK_BackSpace']):
                     sound = self.keysounds['delete']
                     self.bellcount -= 1
                     if self.bellcount <= 0:
                         self.bellcount = 0
-                
-                # * - Shift (and other control keys) 
-                elif    keysym == self.keys['XK_Up'] or \
+
+                # * - Shift (and other control keys)
+                elif keysym == self.keys['XK_Up'] or \
                         keysym == self.keys['XK_Down'] or \
                         keysym == self.keys['XK_Left'] or \
                         keysym == self.keys['XK_Right'] or \
@@ -190,26 +187,26 @@ class TypeWriterSounds:
                         keysym == self.keys['XK_F10'] or \
                         keysym == self.keys['XK_F11'] or \
                         keysym == self.keys['XK_F12'] or \
-                        keysym == self.keys['XK_Super_L'] or\
-                        keysym == self.keys['XK_Super_R'] or\
-                        keysym == self.keys['XK_Escape'] or\
+                        keysym == self.keys['XK_Super_L'] or \
+                        keysym == self.keys['XK_Super_R'] or \
+                        keysym == self.keys['XK_Escape'] or \
                         keysym > 65535:
-                            
+
                     sound = self.keysounds['shift']
-                
+
                 # * - Page Up/Down, Home/End: play page load
-                elif    keysym == self.keys['XK_Page_Up'] or \
-                        keysym == self.keys['XK_Next'] or\
+                elif keysym == self.keys['XK_Page_Up'] or \
+                        keysym == self.keys['XK_Next'] or \
                         keysym == self.keys['XK_Home'] or \
                         keysym == self.keys['XK_End']:
                     sound = self.keysounds['load']
-                
-                # * - A simple key         
+
+                # * - A simple key
                 else:
                     sound = self.keysounds['key']
                     self.bellcount += 1
-                
-                # * - After 70 consecutive keypresses, play the bell sound    
+
+                # * - After 70 consecutive keypresses, play the bell sound
                 if self.bellcount == 70:
                     sound = self.keysounds['bell']
                     self.bellcount = 0
@@ -218,6 +215,7 @@ class TypeWriterSounds:
                 # sound.set_volume(volume)
                 # sound.play()
                 self.ap.play(sound)
+
 
 if __name__ == '__main__':
     TypeWriterSounds()
